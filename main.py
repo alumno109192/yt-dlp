@@ -5,6 +5,7 @@ import yt_dlp
 from bs4 import BeautifulSoup
 import requests
 import json
+import re
 
 app = FastAPI()
 
@@ -36,8 +37,13 @@ def search_videos(query: str):
         scripts = soup.find_all('script')
         for script in scripts:
             if 'var ytInitialData = ' in script.text:
-                data_str = script.text.split('var ytInitialData = ')[1].split(';</script>')[0]
-                data = json.loads(data_str)
+                # Extrae solo el objeto JSON usando regex
+                match = re.search(r'var ytInitialData = (\{.*\});', script.text, re.DOTALL)
+                if match:
+                    data_str = match.group(1)
+                    data = json.loads(data_str)
+                else:
+                    continue
                 
                 # Navegar por la estructura de datos para encontrar videos
                 contents = data.get('contents', {}).get('twoColumnSearchResultsRenderer', {}).get('primaryContents', {})
@@ -92,8 +98,13 @@ def api_search_videos(query: str):
         scripts = soup.find_all('script')
         for script in scripts:
             if 'var ytInitialData = ' in script.text:
-                data_str = script.text.split('var ytInitialData = ')[1].split(';</script>')[0]
-                data = json.loads(data_str)
+                # Extrae solo el objeto JSON usando regex
+                match = re.search(r'var ytInitialData = (\{.*\});', script.text, re.DOTALL)
+                if match:
+                    data_str = match.group(1)
+                    data = json.loads(data_str)
+                else:
+                    continue
                 
                 # Navegar por la estructura de datos para encontrar videos
                 contents = data.get('contents', {}).get('twoColumnSearchResultsRenderer', {}).get('primaryContents', {})
