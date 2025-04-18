@@ -1,11 +1,12 @@
 # main.py (usando FastAPI y yt-dlp)
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
 from bs4 import BeautifulSoup
 import requests
 import json
 import re
+import os
 
 app = FastAPI()
 
@@ -166,18 +167,27 @@ def get_related_videos(video_id: str, title: str = None, artist: str = None):
 
 @app.get("/audio/{video_id}")
 def get_audio(video_id: str):
+    output_path = f"/tmp/{video_id}.m4a"
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'outtmpl': f'/tmp/{video_id}.%(ext)s',
+        'outtmpl': output_path,
         'quiet': True,
         'noplaylist': True,
+        'no_warnings': True,
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
-        filename = ydl.prepare_filename(info)
-        with open(filename, "rb") as f:
+    try:
+        # Descargar el audio de YouTube
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
+        # Leer y servir el archivo
+        with open(output_path, "rb") as f:
             content = f.read()
+        os.remove(output_path)
         return Response(content, media_type="audio/mp4")
+    except Exception as e:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        raise HTTPException(status_code=500, detail=f"Error al descargar audio: {e}")
 
 # Funciones de utilidad para la extracción de información
 def _extract_genres(title: str):
