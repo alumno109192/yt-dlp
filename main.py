@@ -1,5 +1,5 @@
 # main.py (usando FastAPI y yt-dlp)
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
 from bs4 import BeautifulSoup
@@ -163,6 +163,21 @@ def get_related_videos(video_id: str, title: str = None, artist: str = None):
         return api_search_videos(search_query)
     except Exception as e:
         return {"error": str(e)}
+
+@app.get("/audio/{video_id}")
+def get_audio(video_id: str):
+    ydl_opts = {
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        'outtmpl': f'/tmp/{video_id}.%(ext)s',
+        'quiet': True,
+        'noplaylist': True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
+        filename = ydl.prepare_filename(info)
+        with open(filename, "rb") as f:
+            content = f.read()
+        return Response(content, media_type="audio/mp4")
 
 # Funciones de utilidad para la extracción de información
 def _extract_genres(title: str):
