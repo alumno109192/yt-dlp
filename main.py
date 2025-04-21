@@ -71,9 +71,12 @@ def search_videos(query: str):
 @app.get("/audioinfo")
 def get_audio_info(url: str):
     ydl_opts = {
-        'format': 'bestaudio',
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        'outtmpl': output_path,
         'quiet': True,
-        'cookiefile': 'cookies.txt',  # Añade esta línea
+        'noplaylist': True,
+        'no_warnings': True,
+        'cookies': 'cookies.txt',  # <--- Añade esta línea
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -178,7 +181,7 @@ def get_audio(video_id: str):
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
-        'cookiefile': 'cookies.txt',  # Añade esta línea
+        'cookiefile': 'cookies.txt',  # Debe ser 'cookiefile'
     }
     try:
         # Descargar el audio de YouTube
