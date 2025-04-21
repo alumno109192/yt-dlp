@@ -175,22 +175,25 @@ def get_related_videos(video_id: str, title: str = None, artist: str = None):
 @app.get("/audio/{video_id}")
 def get_audio(video_id: str):
     output_path = f"/tmp/{video_id}.m4a"
+    # Si el archivo ya existe, lo servimos directamente
+    if os.path.exists(output_path):
+        with open(output_path, "rb") as f:
+            content = f.read()
+        return Response(content, media_type="audio/mp4")
+    # Si no existe, lo descargamos
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'outtmpl': output_path,
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
-        'cookiefile': 'cookies.txt',  # Debe ser 'cookiefile'
+        'cookiefile': 'cookies.txt',
     }
     try:
-        # Descargar el audio de YouTube
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
-        # Leer y servir el archivo
         with open(output_path, "rb") as f:
             content = f.read()
-        os.remove(output_path)
         return Response(content, media_type="audio/mp4")
     except Exception as e:
         if os.path.exists(output_path):
