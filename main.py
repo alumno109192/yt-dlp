@@ -19,6 +19,33 @@ app.add_middleware(
     allow_headers=["*"],  # Permitir todos los headers
 )
 
+app = FastAPI()
+
+from fastapi import FastAPI, HTTPException, Form
+import yt_dlp
+
+app = FastAPI()
+
+@app.post("/login")
+def login_youtube(
+    username: str = Form(...),
+    password: str = Form(...),
+    cookie_file: str = Form("cookies.txt")
+):
+    ydl_opts = {
+        'username': username,
+        'password': password,
+        'cookiefile': cookie_file,
+        'quiet': True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.extract_info("https://www.youtube.com", download=False)
+        return {"message": f"Cookies exportadas a {cookie_file}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al iniciar sesión: {e}")
+    
+    
 # Añadir este endpoint a tu servidor FastAPI
 @app.get("/search")
 def search_videos(query: str):
@@ -181,6 +208,7 @@ def get_audio(video_id: str):
             content = f.read()
         return Response(content, media_type="audio/mp4")
     # Si no existe, lo descargamos
+
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'outtmpl': output_path,
