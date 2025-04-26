@@ -1,6 +1,6 @@
 # main.py (usando FastAPI y yt-dlp)
 import asyncio
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
@@ -10,10 +10,7 @@ import json
 import re
 import os
 from pytube import YouTube
-from typing import Optional
-import tempfile
 import shutil
-import uuid
 
 app = FastAPI()
 
