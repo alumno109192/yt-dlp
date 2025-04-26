@@ -8,6 +8,7 @@ import requests
 import json
 import re
 import os
+import subprocess
 
 app = FastAPI()
 
@@ -210,18 +211,19 @@ def get_audio(video_id: str):
     if os.path.exists(output_path):
         print(f"[LOG] El archivo ya existe. Sirviendo archivo local.")
         return FileResponse(output_path, media_type="audio/mp4")
-    ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'outtmpl': output_path,
-        'quiet': True,
-        'noplaylist': True,
-        'no_warnings': True,
-        'cookiesfrombrowser': 'chrome',
-    }
+    # Comando yt-dlp CLI
+    cmd = [
+        "yt-dlp",
+        "--cookies", "cookies.txt",
+        "-f", "bestaudio[ext=m4a]",
+        f"https://www.youtube.com/watch?v={video_id}",
+        "-o", output_path
+    ]
     try:
-        print(f"[LOG] El archivo no existe. Iniciando descarga con yt-dlp...")
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
+        print(f"[LOG] El archivo no existe. Iniciando descarga con yt-dlp CLI...")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        print(f"[LOG] yt-dlp stdout:\n{result.stdout}")
+        print(f"[LOG] yt-dlp stderr:\n{result.stderr}")
         print(f"[LOG] Descarga completada. Verificando existencia del archivo...")
         if os.path.exists(output_path):
             print(f"[LOG] Archivo descargado correctamente. Sirviendo archivo.")
@@ -233,8 +235,7 @@ def get_audio(video_id: str):
         print(f"[ERROR] Error al descargar audio: {e}")
         if os.path.exists(output_path):
             os.remove(output_path)
-        raise HTTPException(status_code=500, detail=f"Error al descargar audio: {e}")
-    
+        raise HTTPException(status_code=500, detail=f"Error al descargar audio: {e}")   
 
 # Endpoint para servir el archivo de audio
 @app.get("/stream/{video_id}")
