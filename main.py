@@ -1,5 +1,6 @@
 # main.py (usando FastAPI y yt-dlp)
-from fastapi import FastAPI, Response, HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
 from bs4 import BeautifulSoup
@@ -45,7 +46,7 @@ def login_youtube(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al iniciar sesión: {e}")
     
-    
+
 # Añadir este endpoint a tu servidor FastAPI
 @app.get("/search")
 def search_videos(query: str):
@@ -97,6 +98,7 @@ def search_videos(query: str):
 
 @app.get("/audioinfo")
 def get_audio_info(url: str):
+    output_path = "/tmp/audioinfo.m4a"
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'outtmpl': output_path,
@@ -199,34 +201,36 @@ def get_related_videos(video_id: str, title: str = None, artist: str = None):
     except Exception as e:
         return {"error": str(e)}
 
+# Endpoint para descargar la canción
 @app.get("/audio/{video_id}")
 def get_audio(video_id: str):
     output_path = f"/tmp/{video_id}.m4a"
-    # Si el archivo ya existe, lo servimos directamente
     if os.path.exists(output_path):
-        with open(output_path, "rb") as f:
-            content = f.read()
-        return Response(content, media_type="audio/mp4")
-    # Si no existe, lo descargamos
-
+        return FileResponse(output_path, media_type="audio/mp4")
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'outtmpl': output_path,
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
-        'cookiefile': 'cookies.txt',
+        'cookiefile': 'cookies.txt',  # Usar cookies generadas por /login
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
-        with open(output_path, "rb") as f:
-            content = f.read()
-        return Response(content, media_type="audio/mp4")
+        return FileResponse(output_path, media_type="audio/mp4")
     except Exception as e:
         if os.path.exists(output_path):
             os.remove(output_path)
         raise HTTPException(status_code=500, detail=f"Error al descargar audio: {e}")
+
+# Endpoint para servir el archivo de audio
+@app.get("/stream/{video_id}")
+def stream_audio(video_id: str):
+    audio_path = f"/tmp/{video_id}.m4a"
+    if not os.path.exists(audio_path):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    return FileResponse(audio_path, media_type="audio/mp4")
 
 # Funciones de utilidad para la extracción de información
 def _extract_genres(title: str):
