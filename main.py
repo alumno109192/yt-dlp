@@ -216,7 +216,7 @@ def get_audio(video_id: str):
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
-        'cookiefile': 'cookies.txt',  # Usar cookies generadas por /login
+        'cookiesfrombrowser': 'chrome',
     }
     try:
         print(f"[LOG] El archivo no existe. Iniciando descarga con yt-dlp...")
