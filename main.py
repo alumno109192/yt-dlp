@@ -205,7 +205,10 @@ def get_related_videos(video_id: str, title: str = None, artist: str = None):
 @app.get("/audio/{video_id}")
 def get_audio(video_id: str):
     output_path = f"/tmp/{video_id}.m4a"
+    print(f"[LOG] Petición para descargar/reutilizar audio: {video_id}")
+    print(f"[LOG] Ruta esperada del archivo: {output_path}")
     if os.path.exists(output_path):
+        print(f"[LOG] El archivo ya existe. Sirviendo archivo local.")
         return FileResponse(output_path, media_type="audio/mp4")
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
@@ -216,13 +219,22 @@ def get_audio(video_id: str):
         'cookiefile': 'cookies.txt',  # Usar cookies generadas por /login
     }
     try:
+        print(f"[LOG] El archivo no existe. Iniciando descarga con yt-dlp...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
-        return FileResponse(output_path, media_type="audio/mp4")
+        print(f"[LOG] Descarga completada. Verificando existencia del archivo...")
+        if os.path.exists(output_path):
+            print(f"[LOG] Archivo descargado correctamente. Sirviendo archivo.")
+            return FileResponse(output_path, media_type="audio/mp4")
+        else:
+            print(f"[ERROR] El archivo no se encontró después de la descarga.")
+            raise HTTPException(status_code=500, detail="El archivo no se encontró después de la descarga.")
     except Exception as e:
+        print(f"[ERROR] Error al descargar audio: {e}")
         if os.path.exists(output_path):
             os.remove(output_path)
         raise HTTPException(status_code=500, detail=f"Error al descargar audio: {e}")
+    
 
 # Endpoint para servir el archivo de audio
 @app.get("/stream/{video_id}")
