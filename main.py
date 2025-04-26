@@ -1,5 +1,6 @@
 # main.py (usando FastAPI y yt-dlp)
-from fastapi import FastAPI, HTTPException
+import asyncio
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
@@ -8,7 +9,11 @@ import requests
 import json
 import re
 import os
-import subprocess
+from pytube import YouTube
+from typing import Optional
+import tempfile
+import shutil
+import uuid
 
 app = FastAPI()
 
@@ -202,40 +207,62 @@ def get_related_videos(video_id: str, title: str = None, artist: str = None):
     except Exception as e:
         return {"error": str(e)}
 
-# Endpoint para descargar la canción
+
+async def cleanup_temp(temp_dir: str):
+    """Elimina el directorio temporal después de 5 minutos"""
+    await asyncio.sleep(300)
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+
+# Endpoint para descargar la canción        
 @app.get("/audio/{video_id}")
-def get_audio(video_id: str):
-    output_path = f"/tmp/{video_id}.m4a"
-    print(f"[LOG] Petición para descargar/reutilizar audio: {video_id}")
-    print(f"[LOG] Ruta esperada del archivo: {output_path}")
-    if os.path.exists(output_path):
-        print(f"[LOG] El archivo ya existe. Sirviendo archivo local.")
-        return FileResponse(output_path, media_type="audio/mp4")
-    # Comando yt-dlp CLI
-    cmd = [
-        "yt-dlp",
-        "--cookies", "cookies.txt",
-        "-f", "bestaudio[ext=m4a]",
-        f"https://www.youtube.com/watch?v={video_id}",
-        "-o", output_path
-    ]
+def get_audio(
+   video_id: str, download_path: str = './downloads', 
+    format_type: str = 'video', quality: str = 'highest') -> str:
+    """
+    Descarga un video/audio de YouTube usando solo el ID del video
+    
+    Args:
+        video_id (str): ID del video de YouTube (11 caracteres)
+        download_path (str): Ruta de descarga (default: ./downloads)
+        format_type (str): 'video' o 'audio' (default: video)
+        quality (str): 'highest' o 'lowest' (default: highest)
+    
+    Returns:
+        str: Ruta completa del archivo descargado
+    
+    Raises:
+        ValueError: Si el ID del video es inválido
+        Exception: Errores en la descarga
+    """
+    # Validar formato del ID
+    if not re.match(r'^[A-Za-z0-9_-]{11}$', video_id):
+        raise ValueError("ID de video inválido. Debe tener 11 caracteres alfanuméricos")
+    
     try:
-        print(f"[LOG] El archivo no existe. Iniciando descarga con yt-dlp CLI...")
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        print(f"[LOG] yt-dlp stdout:\n{result.stdout}")
-        print(f"[LOG] yt-dlp stderr:\n{result.stderr}")
-        print(f"[LOG] Descarga completada. Verificando existencia del archivo...")
-        if os.path.exists(output_path):
-            print(f"[LOG] Archivo descargado correctamente. Sirviendo archivo.")
-            return FileResponse(output_path, media_type="audio/mp4")
-        else:
-            print(f"[ERROR] El archivo no se encontró después de la descarga.")
-            raise HTTPException(status_code=500, detail="El archivo no se encontró después de la descarga.")
+        # Construir URL de YouTube
+        youtube_url = f'https://youtu.be/{video_id}'
+        
+        # Crear objeto YouTube
+        yt = YouTube(youtube_url)
+        
+        # Seleccionar stream apropiado
+        streams = yt.streams.filter(only_audio=True)
+        streams = streams.order_by('abr')
+        stream = streams.desc().first() if quality == 'highest' else streams.first()
+      
+        # Crear directorio si no existe
+        os.makedirs(download_path, exist_ok=True)
+
+        # Descargar el archivo
+        filename = f"{yt.title.replace(' ', '_')}_{video_id}.{stream.subtype}"
+        file_path = stream.download(output_path=download_path, filename=filename)
+        
+        return file_path
+
     except Exception as e:
-        print(f"[ERROR] Error al descargar audio: {e}")
-        if os.path.exists(output_path):
-            os.remove(output_path)
-        raise HTTPException(status_code=500, detail=f"Error al descargar audio: {e}")   
+        raise Exception(f"Error al descargar el video: {str(e)}") from e
+
 
 # Endpoint para servir el archivo de audio
 @app.get("/stream/{video_id}")
