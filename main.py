@@ -8,6 +8,7 @@ import requests
 import json
 import re
 import os
+from mutagen.mp4 import MP4
 
 app = FastAPI()
 
@@ -242,7 +243,16 @@ def stream_audio(video_id: str):
     audio_path = f"/tmp/{video_id}.m4a"
     if not os.path.exists(audio_path):
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
-    return FileResponse(audio_path, media_type="audio/mp4")
+    # Obtener duración usando mutagen
+    try:
+        audio = MP4(audio_path)
+        duration = int(audio.info.length)
+    except Exception as e:
+        duration = None
+    headers = {}
+    if duration:
+        headers["X-Audio-Duration"] = str(duration)
+    return FileResponse(audio_path, media_type="audio/mp4", headers=headers)
 
 # Funciones de utilidad para la extracción de información
 def _extract_genres(title: str):
