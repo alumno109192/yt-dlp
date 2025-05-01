@@ -1,5 +1,5 @@
 # main.py (usando FastAPI y yt-dlp)
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile, logger
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
@@ -25,12 +25,17 @@ app.add_middleware(
 
 # Ruta para el archivo de cookies
 COOKIE_PATH = "cookies.txt"
-
 # Función para generar cookies automáticamente
 def generate_cookies():
+    logger.info("Intentando generar cookies con browser_cookie3")
     try:
         # Extraer cookies de Chrome (cambia a 'firefox' si usas Firefox)
         cookies = browser_cookie3.chrome(domain_name="youtube.com")
+        if not cookies:
+            logger.error("No se encontraron cookies de youtube.com")
+            return False
+        
+        logger.info(f"Extraídas {len(cookies)} cookies de youtube.com")
         with open(COOKIE_PATH, "w") as f:
             f.write("# Netscape HTTP Cookie File\n")
             for cookie in cookies:
@@ -45,23 +50,48 @@ def generate_cookies():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.extract_info("https://www.youtube.com", download=False)
         
+        logger.info("Cookies generadas y validadas correctamente")
         return True
     except Exception as e:
-        print(f"[ERROR] Error al generar cookies: {e}")
+        logger.error(f"Error al generar cookies: {str(e)}")
         if os.path.exists(COOKIE_PATH):
             os.remove(COOKIE_PATH)
         return False
 
 # Endpoint para inicializar cookies
 @app.post("/login")
-async def login_youtube():
+async def login_youtube(cookie_file: UploadFile = File(None)):
+    if cookie_file:
+        logger.info("Subiendo cookies manualmente desde archivo")
+        try:
+            with open(COOKIE_PATH, "wb") as f:
+                f.write(await cookie_file.read())
+            # Verificar si las cookies son válidas
+            ydl_opts = {
+                'cookiefile': COOKIE_PATH,
+                'quiet': True,
+                'no_warnings': True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info("https://www.youtube.com", download=False)
+            logger.info("Cookies manuales validadas correctamente")
+            return {"message": "Cookies subidas y validadas correctamente"}
+        except Exception as e:
+            logger.error(f"Error al validar cookies manuales: {str(e)}")
+            if os.path.exists(COOKIE_PATH):
+                os.remove(COOKIE_PATH)
+            raise HTTPException(status_code=500, detail=f"Error al procesar cookies manuales: {str(e)}")
+    
+    # Intentar usar cookies existentes si son recientes
     if os.path.exists(COOKIE_PATH) and os.path.getmtime(COOKIE_PATH) > time.time() - 24 * 3600:
+        logger.info("Usando cookies existentes recientes")
         return {"message": "Cookies ya están disponibles y son recientes"}
     
+    # Generar cookies automáticamente
     if generate_cookies():
-        return {"message": "Cookies generadas correctamente"}
+        return {"message": "Cookies generadas automáticamente"}
     else:
-        raise HTTPException(status_code=500, detail="Error al generar cookies")  
+        raise HTTPException(status_code=500, detail="No se pudieron generar cookies válidas")
 
 # Añadir este endpoint a tu servidor FastAPI
 @app.get("/search")
