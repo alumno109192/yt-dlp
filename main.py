@@ -33,24 +33,17 @@ import yt_dlp
 app = FastAPI()
 
 @app.post("/login")
-def login_youtube(
-    username: str = Form(...),
-    password: str = Form(...),
-    cookie_file: str = Form("cookies.txt")
-):
+def login_youtube(cookie_file: str = Form("cookies.txt")):
     ydl_opts = {
-        'username': username,
-        'password': password,
         'cookiefile': cookie_file,
         'quiet': True,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.extract_info("https://www.youtube.com", download=False)
-        return {"message": f"Cookies exportadas a {cookie_file}"}
+        return {"message": f"Cookies cargadas desde {cookie_file}"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al iniciar sesión: {e}")
-    
+        raise HTTPException(status_code=500, detail=f"Error al cargar cookies: {e}")
 
 # Añadir este endpoint a tu servidor FastAPI
 @app.get("/search")
