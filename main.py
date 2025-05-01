@@ -11,6 +11,11 @@ import os
 from mutagen.mp4 import MP4
 import browser_cookie3
 import time
+import logging
+
+# Configurar el logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
