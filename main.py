@@ -27,30 +27,44 @@ app.add_middleware(
     allow_methods=["*"],  # Permitir todos los métodos
     allow_headers=["*"],  # Permitir todos los headers
 )
-
 # Ruta para el archivo de cookies
 COOKIE_PATH = "cookies.txt"
+
 # Función para generar cookies automáticamente
 def generate_cookies():
-    logger.info("Intentando generar cookies con browser_cookie3")
+    logger.debug("Iniciando generación de cookies con browser_cookie3")
     try:
-        # Extraer cookies de Chrome (cambia a 'firefox' si usas Firefox)
+        # Intentar extraer cookies de Chrome
         cookies = browser_cookie3.chrome(domain_name="youtube.com")
         if not cookies:
-            logger.error("No se encontraron cookies de youtube.com")
+            logger.error("No se encontraron cookies de youtube.com en Chrome")
             return False
         
-        logger.info(f"Extraídas {len(cookies)} cookies de youtube.com")
+        logger.debug(f"Extraídas {len(cookies)} cookies de youtube.com")
+        # Verificar si hay cookies críticas (como SID o __Secure-3PSID)
+        has_required_cookies = any(cookie.name in ['SID', '__Secure-3PSID'] for cookie in cookies)
+        if not has_required_cookies:
+            logger.error("No se encontraron cookies críticas (SID o __Secure-3PSID)")
+            return False
+        
+        # Escribir cookies al archivo
         with open(COOKIE_PATH, "w") as f:
             f.write("# Netscape HTTP Cookie File\n")
             for cookie in cookies:
-                f.write(f"{cookie.domain}\tTRUE\t{cookie.path}\t{cookie.secure}\t{cookie.expires}\t{cookie.name}\t{cookie.value}\n")
+                logger.debug(f"Escribiendo cookie: {cookie.name}")
+                f.write(f"{cookie.domain}\tTRUE\t{cookie.path}\t{cookie.secure}\t{cookie.expires or 0}\t{cookie.name}\t{cookie.value}\n")
         
-        # Verificar si las cookies son válidas
+        # Verificar si el archivo se creó correctamente
+        if not os.path.exists(COOKIE_PATH):
+            logger.error("No se pudo crear el archivo cookies.txt")
+            return False
+        
+        # Validar cookies con una solicitud de prueba
         ydl_opts = {
             'cookiefile': COOKIE_PATH,
             'quiet': True,
             'no_warnings': True,
+            'verbose': True,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.extract_info("https://www.youtube.com", download=False)
@@ -58,7 +72,7 @@ def generate_cookies():
         logger.info("Cookies generadas y validadas correctamente")
         return True
     except Exception as e:
-        logger.error(f"Error al generar cookies: {str(e)}")
+        logger.error(f"Error al generar cookies: {str(e)}", exc_info=True)
         if os.path.exists(COOKIE_PATH):
             os.remove(COOKIE_PATH)
         return False
@@ -71,11 +85,12 @@ async def login_youtube(cookie_file: UploadFile = File(None)):
         try:
             with open(COOKIE_PATH, "wb") as f:
                 f.write(await cookie_file.read())
-            # Verificar si las cookies son válidas
+            # Validar cookies
             ydl_opts = {
                 'cookiefile': COOKIE_PATH,
                 'quiet': True,
                 'no_warnings': True,
+                'verbose': True,
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.extract_info("https://www.youtube.com", download=False)
@@ -87,17 +102,29 @@ async def login_youtube(cookie_file: UploadFile = File(None)):
                 os.remove(COOKIE_PATH)
             raise HTTPException(status_code=500, detail=f"Error al procesar cookies manuales: {str(e)}")
     
-    # Intentar usar cookies existentes si son recientes
+    # Intentar usar cookies existentes si son recientes (24 horas)
     if os.path.exists(COOKIE_PATH) and os.path.getmtime(COOKIE_PATH) > time.time() - 24 * 3600:
         logger.info("Usando cookies existentes recientes")
-        return {"message": "Cookies ya están disponibles y son recientes"}
+        try:
+            ydl_opts = {
+                'cookiefile': COOKIE_PATH,
+                'quiet': True,
+                'no_warnings': True,
+                'verbose': True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info("https://www.youtube.com", download=False)
+            return {"message": "Cookies existentes validadas y listas"}
+        except Exception as e:
+            logger.warning(f"Cookies existentes no válidas: {str(e)}")
+            os.remove(COOKIE_PATH)
     
     # Generar cookies automáticamente
+    logger.info("Generando cookies automáticamente")
     if generate_cookies():
         return {"message": "Cookies generadas automáticamente"}
     else:
-        raise HTTPException(status_code=500, detail="No se pudieron generar cookies válidas")
-
+        raise HTTPException(status_code=500, detail="No se pudieron generar cookies válidas. Por favor, sube cookies manualmente.")
 # Añadir este endpoint a tu servidor FastAPI
 @app.get("/search")
 def search_videos(query: str):
