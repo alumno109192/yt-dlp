@@ -9,6 +9,7 @@ import json
 import re
 import os
 from mutagen.mp4 import MP4
+import browser_cookie3
 
 app = FastAPI()
 
@@ -21,32 +22,45 @@ app.add_middleware(
     allow_headers=["*"],  # Permitir todos los headers
 )
 
-app = FastAPI()
+# Ruta para el archivo de cookies
+COOKIE_PATH = "cookies.txt"
 
-from fastapi import FastAPI, HTTPException, Form
-import yt_dlp
-
-app = FastAPI()
-
-@app.post("/login")
-def login_youtube(
-    username: str = Form(...),
-    password: str = Form(...),
-    cookie_file: str = Form("cookies.txt")
-):
-    ydl_opts = {
-        'username': username,
-        'password': password,
-        'cookiefile': cookie_file,
-        'quiet': True,
-    }
+# Función para generar cookies automáticamente
+def generate_cookies():
     try:
+        # Extraer cookies de Chrome (cambia a 'firefox' si usas Firefox)
+        cookies = browser_cookie3.chrome(domain_name="youtube.com")
+        with open(COOKIE_PATH, "w") as f:
+            f.write("# Netscape HTTP Cookie File\n")
+            for cookie in cookies:
+                f.write(f"{cookie.domain}\tTRUE\t{cookie.path}\t{cookie.secure}\t{cookie.expires}\t{cookie.name}\t{cookie.value}\n")
+        
+        # Verificar si las cookies son válidas
+        ydl_opts = {
+            'cookiefile': COOKIE_PATH,
+            'quiet': True,
+            'no_warnings': True,
+        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.extract_info("https://www.youtube.com", download=False)
-        return {"message": f"Cookies exportadas a {cookie_file}"}
+        
+        return True
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al iniciar sesión: {e}")
+        print(f"[ERROR] Error al generar cookies: {e}")
+        if os.path.exists(COOKIE_PATH):
+            os.remove(COOKIE_PATH)
+        return False
+
+# Endpoint para inicializar cookies
+@app.post("/login")
+async def login_youtube():
+    if os.path.exists(COOKIE_PATH) and os.path.getmtime(COOKIE_PATH) > time.time() - 24 * 3600:
+        return {"message": "Cookies ya están disponibles y son recientes"}
     
+    if generate_cookies():
+        return {"message": "Cookies generadas correctamente"}
+    else:
+        raise HTTPException(status_code=500, detail="Error al generar cookies")  
 
 # Añadir este endpoint a tu servidor FastAPI
 @app.get("/search")
