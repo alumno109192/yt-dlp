@@ -30,12 +30,12 @@ SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
 CLIENT_SECRETS_FILE = 'client_secrets.json'  # Sube este archivo a Render.com
 TOKEN_FILE = 'token.json'  # Se generará tras la autenticación
 
-# Configurar el flujo OAuth
-flow = Flow.from_client_secrets_file(
-    CLIENT_SECRETS_FILE,
-    scopes=SCOPES,
-    redirect_uri='https://<tu-app>.onrender.com/oauth2callback'  # Cambia esto por tu URL real
-)
+CLIENT_SECRETS_JSON = os.getenv('CLIENT_SECRETS_JSON')
+if CLIENT_SECRETS_JSON:
+    client_secrets = json.loads(CLIENT_SECRETS_JSON)
+    flow = Flow.from_client_config(client_secrets, scopes=SCOPES)
+else:
+    raise FileNotFoundError("El archivo client_secrets.json no se encontró y no se configuró la variable de entorno.")
 
 # Endpoint para iniciar la autenticación OAuth
 @app.get("/login")
