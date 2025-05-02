@@ -44,21 +44,35 @@ else:
 @app.get("/login")
 def login():
     """Inicia el flujo de autenticación OAuth 2.0 redirigiendo al usuario a Google."""
-    authorization_url, state = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true'
-    )
-    return RedirectResponse(authorization_url)
+    try:
+        logger.info("Iniciando el flujo de autenticación OAuth 2.0.")
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true'
+        )
+        logger.info(f"URL de autorización generada: {authorization_url}")
+        return RedirectResponse(authorization_url)
+    except Exception as e:
+        logger.error(f"Error al iniciar el flujo de autenticación: {e}")
+        raise HTTPException(status_code=500, detail="Error al iniciar el flujo de autenticación.")
 
 # Endpoint para manejar el callback de OAuth
 @app.get("/oauth2callback")
 def oauth2callback(request: Request):
     """Maneja la respuesta de Google y guarda las credenciales."""
-    flow.fetch_token(authorization_response=str(request.url))
-    credentials = flow.credentials
-    with open(TOKEN_FILE, 'w') as token_file:
-        token_file.write(credentials.to_json())
-    return {"message": "Autenticación completada"}
+    try:
+        logger.info("Recibiendo el callback de OAuth 2.0.")
+        logger.info(f"URL de la solicitud: {request.url}")
+        flow.fetch_token(authorization_response=str(request.url))
+        credentials = flow.credentials
+        logger.info("Token de acceso obtenido correctamente.")
+        with open(TOKEN_FILE, 'w') as token_file:
+            token_file.write(credentials.to_json())
+        logger.info(f"Credenciales guardadas en {TOKEN_FILE}.")
+        return {"message": "Autenticación completada"}
+    except Exception as e:
+        logger.error(f"Error al manejar el callback de OAuth: {e}")
+        raise HTTPException(status_code=500, detail="Error al manejar el callback de OAuth.")
 
 # Función para obtener el servicio de YouTube autenticado
 def get_youtube_service():
