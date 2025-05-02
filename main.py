@@ -27,15 +27,18 @@ app.add_middleware(
 
 # Configuración de OAuth 2.0
 SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
-CLIENT_SECRETS_FILE = 'client_secrets.json'  # Sube este archivo a Render.com
+CLIENT_SECRETS_FILE = '/etc/secrets/client_secrets.json'  # Ruta del archivo en Render.com
 TOKEN_FILE = 'token.json'  # Se generará tras la autenticación
 
-CLIENT_SECRETS_JSON = os.getenv('CLIENT_SECRETS_JSON')
-if CLIENT_SECRETS_JSON:
+CLIENT_SECRETS_JSON = os.getenv('CLIENT_SECRETS')
+
+if os.path.exists(CLIENT_SECRETS_FILE):
+    flow = Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES)
+elif CLIENT_SECRETS_JSON:
     client_secrets = json.loads(CLIENT_SECRETS_JSON)
     flow = Flow.from_client_config(client_secrets, scopes=SCOPES)
 else:
-    raise FileNotFoundError("El archivo client_secrets.json no se encontró y no se configuró la variable de entorno.")
+    raise FileNotFoundError("El archivo client_secrets.json no se encontró ni se configuró la variable de entorno.")
 
 # Endpoint para iniciar la autenticación OAuth
 @app.get("/login")
