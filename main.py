@@ -61,8 +61,8 @@ def generate_cookies(browser: str = Form("chrome"), cookie_file: str = "cookies.
     Genera cookies automáticamente desde un navegador compatible.
     """
     ydl_opts = {
-        'cookiesfrombrowser': browser,  # Extraer cookies desde el navegador especificado
-        'cookiefile': cookie_file,      # Guardar las cookies en un archivo
+        'cookiesfrombrowser': str(browser),  # Asegurarse de que sea una cadena
+        'cookiefile': cookie_file,          # Guardar las cookies en un archivo
         'quiet': True,
     }
     try:
