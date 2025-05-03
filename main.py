@@ -41,7 +41,7 @@ client_config = {
 SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 
 # Crear el flujo OAuth 2.0
-flow = Flow.from_client_config(client_config, scopes=SCOPES)
+flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=os.getenv("REDIRECT_URI"))
 
 # Endpoint para iniciar la autenticación
 @app.get("/login")
@@ -51,8 +51,7 @@ def login():
         logger.info("Iniciando el flujo de autenticación OAuth 2.0.")
         authorization_url, state = flow.authorization_url(
             access_type='offline',
-            include_granted_scopes='true',
-            redirect_uri=os.getenv("REDIRECT_URI")
+            include_granted_scopes='true'
         )
         logger.info(f"URL de autorización generada: {authorization_url}")
         return RedirectResponse(authorization_url)
@@ -78,6 +77,7 @@ async def oauth2callback(request: Request):
     except Exception as e:
         logger.error(f"Error al manejar el callback de OAuth: {e}")
         raise HTTPException(status_code=500, detail="Error al manejar el callback de OAuth.")
+    
 
 # Función para obtener el servicio de YouTube autenticado
 def get_youtube_service():
