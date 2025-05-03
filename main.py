@@ -118,7 +118,7 @@ def search_videos(query: str):
                 'id': item['id']['videoId'],
                 'title': item['snippet']['title'],
                 'channel': item['snippet']['channelTitle'],
-                'thumbnail': info["thumbnail"],
+                'thumbnail': item['snippet']['thumbnails']['default']['url'],
             })
         return results
     except Exception as e:
