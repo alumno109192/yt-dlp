@@ -208,29 +208,24 @@ def get_related_videos(video_id: str, title: str = None, artist: str = None):
 
 # Endpoint para descargar la canción
 import os
+import tempfile
 
 @app.get("/audio/{video_id}")
 def get_audio(video_id: str):
-    output_path = f"/tmp/{video_id}.m4a"
+    output_path = f"/tmp/{video_id}.m4a" 
 
     # Obtener el contenido de la variable de entorno COOKIES
     cookies_content = os.getenv("COOKIES")
-    if cookies_content:
-        try:
-            logger.info(f"[LOG] Contenido de la variable de entorno COOKIES: {cookies_content}...")  # Muestra los primeros 100 caracteres
-        except Exception as e:
-            logger.error(f"[ERROR] Error al procesar las cookies desde la variable de entorno: {e}")
-            raise HTTPException(status_code=500, detail="Error al procesar las cookies.")
-    else:
+    if not cookies_content:
         logger.warning("[WARNING] La variable de entorno COOKIES no está configurada.")
         raise HTTPException(status_code=500, detail="No se encontraron cookies en la variable de entorno.")
 
-    logger.info(f"[LOG] Petición para descargar/reutilizar audio: {video_id}")
-    logger.info(f"[LOG] Ruta esperada del archivo: {output_path}")
+    # Escribir las cookies en un archivo temporal
+    with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as temp_cookies_file:
+        temp_cookies_file.write(cookies_content)
+        temp_cookies_path = temp_cookies_file.name
 
-    if os.path.exists(output_path):
-        logger.info("[LOG] El archivo ya existe. Sirviendo archivo local.")
-        return FileResponse(output_path, media_type="audio/mp4")
+    logger.info(f"[LOG] Cookies guardadas temporalmente en: {temp_cookies_path}")
 
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
@@ -238,7 +233,10 @@ def get_audio(video_id: str):
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
-        'cookies': cookies_content,  # Usar cookies directamente desde la variable
+        'cookiefile': temp_cookies_path,  # Usar el archivo temporal de cookies
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        },
     }
 
     try:
@@ -257,6 +255,10 @@ def get_audio(video_id: str):
         if os.path.exists(output_path):
             os.remove(output_path)
         raise HTTPException(status_code=500, detail=f"Error al descargar audio: {e}")
+    finally:
+        # Eliminar el archivo temporal de cookies
+        if os.path.exists(temp_cookies_path):
+            os.remove(temp_cookies_path)
 
 # Endpoint para servir el archivo de audio
 @app.get("/stream/{video_id}")
