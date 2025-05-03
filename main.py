@@ -212,19 +212,14 @@ import os
 @app.get("/audio/{video_id}")
 def get_audio(video_id: str):
     output_path = f"/tmp/{video_id}.m4a"
-    cookies_file_path = "/tmp/cookies.txt"
 
     # Obtener el contenido de la variable de entorno COOKIES
     cookies_content = os.getenv("COOKIES")
     if cookies_content:
         try:
             logger.info(f"[LOG] Contenido de la variable de entorno COOKIES: {cookies_content[:100]}...")  # Muestra los primeros 100 caracteres
-            # Guardar el contenido de COOKIES en un archivo temporal
-            with open(cookies_file_path, "w") as cookies_file:
-                cookies_file.write(cookies_content)
-            logger.info(f"[LOG] Cookies guardadas en: {cookies_file_path}")
         except Exception as e:
-            logger.error(f"[ERROR] Error al guardar las cookies desde la variable de entorno: {e}")
+            logger.error(f"[ERROR] Error al procesar las cookies desde la variable de entorno: {e}")
             raise HTTPException(status_code=500, detail="Error al procesar las cookies.")
     else:
         logger.warning("[WARNING] La variable de entorno COOKIES no está configurada.")
@@ -243,7 +238,7 @@ def get_audio(video_id: str):
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
-        'cookiefile': cookies_file_path,  # Usar cookies desde el archivo temporal
+        'cookies': cookies_content,  # Usar cookies directamente desde la variable
     }
 
     try:
