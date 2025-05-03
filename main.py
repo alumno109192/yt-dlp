@@ -207,39 +207,61 @@ def get_related_videos(video_id: str, title: str = None, artist: str = None):
         return {"error": str(e)}
 
 # Endpoint para descargar la canción
+import os
+
 @app.get("/audio/{video_id}")
 def get_audio(video_id: str):
     output_path = f"/tmp/{video_id}.m4a"
-    print(f"[LOG] Petición para descargar/reutilizar audio: {video_id}")
-    print(f"[LOG] Ruta esperada del archivo: {output_path}")
+    cookies_file_path = "/tmp/cookies.txt"
+
+    # Obtener el contenido de la variable de entorno COOKIES
+    cookies_content = os.getenv("COOKIES")
+    if cookies_content:
+        try:
+            logger.info(f"[LOG] Contenido de la variable de entorno COOKIES: {cookies_content[:100]}...")  # Muestra los primeros 100 caracteres
+            # Guardar el contenido de COOKIES en un archivo temporal
+            with open(cookies_file_path, "w") as cookies_file:
+                cookies_file.write(cookies_content)
+            logger.info(f"[LOG] Cookies guardadas en: {cookies_file_path}")
+        except Exception as e:
+            logger.error(f"[ERROR] Error al guardar las cookies desde la variable de entorno: {e}")
+            raise HTTPException(status_code=500, detail="Error al procesar las cookies.")
+    else:
+        logger.warning("[WARNING] La variable de entorno COOKIES no está configurada.")
+        raise HTTPException(status_code=500, detail="No se encontraron cookies en la variable de entorno.")
+
+    logger.info(f"[LOG] Petición para descargar/reutilizar audio: {video_id}")
+    logger.info(f"[LOG] Ruta esperada del archivo: {output_path}")
+
     if os.path.exists(output_path):
-        print(f"[LOG] El archivo ya existe. Sirviendo archivo local.")
+        logger.info("[LOG] El archivo ya existe. Sirviendo archivo local.")
         return FileResponse(output_path, media_type="audio/mp4")
+
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'outtmpl': output_path,
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
-        'cookiefile': 'cookies.txt',  # Usar cookies generadas por /login
+        'cookiefile': cookies_file_path,  # Usar cookies desde el archivo temporal
     }
+
     try:
-        print(f"[LOG] El archivo no existe. Iniciando descarga con yt-dlp...")
+        logger.info("[LOG] El archivo no existe. Iniciando descarga con yt-dlp...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
-        print(f"[LOG] Descarga completada. Verificando existencia del archivo...")
+        logger.info("[LOG] Descarga completada. Verificando existencia del archivo...")
         if os.path.exists(output_path):
-            print(f"[LOG] Archivo descargado correctamente. Sirviendo archivo.")
+            logger.info("[LOG] Archivo descargado correctamente. Sirviendo archivo.")
             return FileResponse(output_path, media_type="audio/mp4")
         else:
-            print(f"[ERROR] El archivo no se encontró después de la descarga.")
+            logger.error("[ERROR] El archivo no se encontró después de la descarga.")
             raise HTTPException(status_code=500, detail="El archivo no se encontró después de la descarga.")
     except Exception as e:
-        print(f"[ERROR] Error al descargar audio: {e}")
+        logger.error(f"[ERROR] Error al descargar audio: {e}")
         if os.path.exists(output_path):
             os.remove(output_path)
         raise HTTPException(status_code=500, detail=f"Error al descargar audio: {e}")
-    
 
 # Endpoint para servir el archivo de audio
 @app.get("/stream/{video_id}")
