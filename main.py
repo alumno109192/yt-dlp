@@ -217,7 +217,7 @@ def get_audio(video_id: str):
     cookies_content = os.getenv("COOKIES")
     if cookies_content:
         try:
-            logger.info(f"[LOG] Contenido de la variable de entorno COOKIES: {cookies_content[:100]}...")  # Muestra los primeros 100 caracteres
+            logger.info(f"[LOG] Contenido de la variable de entorno COOKIES: {cookies_content}...")  # Muestra los primeros 100 caracteres
         except Exception as e:
             logger.error(f"[ERROR] Error al procesar las cookies desde la variable de entorno: {e}")
             raise HTTPException(status_code=500, detail="Error al procesar las cookies.")
