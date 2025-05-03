@@ -53,6 +53,9 @@ except Exception as e:
     logger.error(f"Failed to create OAuth flow: {e}")
     raise
 
+# Ruta al archivo de cookies
+COOKIES_FILE = 'cookies.txt'
+
 # Endpoint para iniciar la autenticación
 @app.get("/login")
 def login():
@@ -115,10 +118,11 @@ def search_videos(query: str):
                 'id': item['id']['videoId'],
                 'title': item['snippet']['title'],
                 'channel': item['snippet']['channelTitle'],
-                'thumbnail': item['snippet']['thumbnails']['default']['url']
+                'thumbnail': info["thumbnail"],
             })
         return results
     except Exception as e:
+        logger.error(f"Error al buscar videos: {e}")
         raise HTTPException(status_code=500, detail=f"Error al buscar videos: {e}")
 
 # Endpoint para obtener información del audio
@@ -132,8 +136,14 @@ def get_audio_info(url: str):
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
-        'cookiefile': 'cookies.txt',  # Usar cookies para autenticación
     }
+    # Verificar si el archivo de cookies existe
+    if os.path.exists(COOKIES_FILE):
+        ydl_opts['cookiefile'] = COOKIES_FILE
+        logger.info(f"Usando archivo de cookies: {COOKIES_FILE}")
+    else:
+        logger.warning(f"Archivo de cookies {COOKIES_FILE} no encontrado. Intentando sin cookies.")
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -155,14 +165,21 @@ def get_audio(video_id: str):
     if os.path.exists(output_path):
         logger.info("El archivo ya existe. Sirviendo archivo local.")
         return FileResponse(output_path, media_type="audio/mp4")
+    
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'outtmpl': output_path,
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
-        'cookiefile': 'cookies.txt',  # Usar cookies para autenticación
     }
+    # Verificar si el archivo de cookies existe
+    if os.path.exists(COOKIES_FILE):
+        ydl_opts['cookiefile'] = COOKIES_FILE
+        logger.info(f"Usando archivo de cookies: {COOKIES_FILE}")
+    else:
+        logger.warning(f"Archivo de cookies {COOKIES_FILE} no encontrado. Intentando sin cookies.")
+    
     try:
         logger.info("Iniciando descarga con yt-dlp...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
