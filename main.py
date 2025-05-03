@@ -242,7 +242,10 @@ def get_audio(video_id: str):
         command = [
             "yt-dlp",
             f"https://www.youtube.com/watch?v={video_id}",
-            "--cookies", temp_cookies_path
+            "--cookies", temp_cookies_path,
+            "-f", "bestaudio[ext=m4a]/bestaudio/best",
+            "-o", output_path,
+            "--add-header", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         ]
 
         # Log del comando que se ejecutará
