@@ -212,7 +212,7 @@ import tempfile
 
 @app.get("/audio/{video_id}")
 def get_audio(video_id: str):
-    output_path = f"/tmp/{video_id}.m4a" 
+    output_path = f"/tmp/{video_id}.m4a"
 
     # Obtener el contenido de la variable de entorno COOKIES
     cookies_content = os.getenv("COOKIES")
@@ -225,7 +225,15 @@ def get_audio(video_id: str):
         temp_cookies_file.write(cookies_content)
         temp_cookies_path = temp_cookies_file.name
 
+    # Log para verificar que el archivo se ha guardado
     logger.info(f"[LOG] Cookies guardadas temporalmente en: {temp_cookies_path}")
+    try:
+        with open(temp_cookies_path, "r") as f:
+            file_content = f.read()
+            logger.info(f"[LOG] Contenido del archivo de cookies:\n{file_content}")
+    except Exception as e:
+        logger.error(f"[ERROR] No se pudo leer el archivo de cookies: {e}")
+        raise HTTPException(status_code=500, detail="Error al leer el archivo de cookies.")
 
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
