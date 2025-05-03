@@ -242,10 +242,12 @@ def get_audio(video_id: str):
         command = [
             "yt-dlp",
             f"https://www.youtube.com/watch?v={video_id}",
-            "--cookies", temp_cookies_path,
-            "-f", "bestaudio[ext=m4a]/bestaudio/best",
-            "-o", output_path
+            "--cookies", temp_cookies_path
         ]
+
+        # Log del comando que se ejecutará
+        logger.info(f"[LOG] Comando ejecutado: {' '.join(command)}")
+
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
         # Log de la salida del comando
