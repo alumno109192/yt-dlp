@@ -25,6 +25,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Lista de variables de entorno requeridas
+REQUIRED_ENV_VARS = [
+    "CLIENT_ID",
+    "CLIENT_SECRET",
+    "REDIRECT_URI",
+    "AUTH_URI",
+    "TOKEN_URI",
+    "AUTH_PROVIDER_X509_CERT_URL"
+]
+
+# Validar variables de entorno
+missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
+if missing_vars:
+    logger.error(f"Missing environment variables: {', '.join(missing_vars)}")
+    raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}")
+
 # Configuración de OAuth 2.0 usando variables de entorno
 client_config = {
     "web": {
@@ -40,8 +56,13 @@ client_config = {
 # Scopes para la API de YouTube
 SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 
-# Crear el flujo OAuth 2.0
-flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=os.getenv("REDIRECT_URI"))
+# Crear el flujo OAuth 2.0 con redirect_uri configurado
+try:
+    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=os.getenv("REDIRECT_URI"))
+except Exception as e:
+    logger.error(f"Failed to create OAuth flow: {e}")
+    raise
+
 
 # Endpoint para iniciar la autenticación
 @app.get("/login")
@@ -57,7 +78,7 @@ def login():
         return RedirectResponse(authorization_url)
     except Exception as e:
         logger.error(f"Error al iniciar el flujo de autenticación: {e}")
-        raise HTTPException(status_code=500, detail="Error al iniciar el flujo de autenticación.")
+        raise HTTPException(status_code=500, detail=f"Error al iniciar el flujo de autenticación: {str(e)}")
 
 
 # Endpoint para manejar el callback de OAuth
