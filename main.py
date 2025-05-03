@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
-from fastapi.middleware.cors import CORSMiddleware
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
@@ -15,15 +14,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-
-# Configuración de CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Lista de variables de entorno requeridas
 REQUIRED_ENV_VARS = [
@@ -63,7 +53,6 @@ except Exception as e:
     logger.error(f"Failed to create OAuth flow: {e}")
     raise
 
-
 # Endpoint para iniciar la autenticación
 @app.get("/login")
 def login():
@@ -79,7 +68,6 @@ def login():
     except Exception as e:
         logger.error(f"Error al iniciar el flujo de autenticación: {e}")
         raise HTTPException(status_code=500, detail=f"Error al iniciar el flujo de autenticación: {str(e)}")
-
 
 # Endpoint para manejar el callback de OAuth
 @app.get("/oauth2callback")
@@ -97,8 +85,7 @@ async def oauth2callback(request: Request):
         return {"message": "Autenticación completada"}
     except Exception as e:
         logger.error(f"Error al manejar el callback de OAuth: {e}")
-        raise HTTPException(status_code=500, detail="Error al manejar el callback de OAuth.")
-    
+        raise HTTPException(status_code=500, detail=f"Error al manejar el callback de OAuth: {str(e)}")
 
 # Función para obtener el servicio de YouTube autenticado
 def get_youtube_service():
@@ -109,8 +96,7 @@ def get_youtube_service():
         credentials = Credentials.from_authorized_user_info(json.load(token_file), SCOPES)
     return build('youtube', 'v3', credentials=credentials)
 
-
-# Ejemplo: Endpoint para buscar videos usando la API de YouTube
+# Endpoint para buscar videos usando la API de YouTube
 @app.get("/search")
 def search_videos(query: str):
     """Busca videos en YouTube usando la API oficial."""
@@ -134,7 +120,7 @@ def search_videos(query: str):
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al buscar videos: {e}")
-    
+
 # Endpoint para obtener información del audio
 @app.get("/audioinfo")
 def get_audio_info(url: str):
@@ -146,14 +132,19 @@ def get_audio_info(url: str):
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
+        'cookiefile': 'cookies.txt',  # Usar cookies para autenticación
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
         return {
             "title": info["title"],
             "url": info["url"],
             "thumbnail": info["thumbnail"],
         }
+    except Exception as e:
+        logger.error(f"Error al obtener información del audio: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener información del audio: {e}")
 
 # Endpoint para descargar audio
 @app.get("/audio/{video_id}")
@@ -170,6 +161,7 @@ def get_audio(video_id: str):
         'quiet': True,
         'noplaylist': True,
         'no_warnings': True,
+        'cookiefile': 'cookies.txt',  # Usar cookies para autenticación
     }
     try:
         logger.info("Iniciando descarga con yt-dlp...")
