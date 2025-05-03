@@ -25,22 +25,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configuración de OAuth 2.0
-SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
-CLIENT_SECRETS_FILE = '/etc/secrets/client_secrets.json'  # Ruta del archivo en Render.com
-TOKEN_FILE = 'token.json'  # Se generará tras la autenticación
+# Configuración de OAuth 2.0 usando variables de entorno
+client_config = {
+    "web": {
+        "client_id": os.getenv("CLIENT_ID"),
+        "client_secret": os.getenv("CLIENT_SECRET"),
+        "redirect_uris": [os.getenv("REDIRECT_URI")],
+        "auth_uri": os.getenv("AUTH_URI"),
+        "token_uri": os.getenv("TOKEN_URI"),
+        "auth_provider_x509_cert_url": os.getenv("AUTH_PROVIDER_X509_CERT_URL")
+    }
+}
 
-CLIENT_SECRETS_JSON = os.getenv('CLIENT_SECRETS')
+# Scopes para la API de YouTube
+SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 
-if os.path.exists(CLIENT_SECRETS_FILE):
-    flow = Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES)
-elif CLIENT_SECRETS_JSON:
-    client_secrets = json.loads(CLIENT_SECRETS_JSON)
-    flow = Flow.from_client_config(client_secrets, scopes=SCOPES)
-else:
-    raise FileNotFoundError("El archivo client_secrets.json no se encontró ni se configuró la variable de entorno.")
+# Crear el flujo OAuth 2.0
+flow = Flow.from_client_config(client_config, scopes=SCOPES)
 
-# Endpoint para iniciar la autenticación OAuth
+# Endpoint para iniciar la autenticación
 @app.get("/login")
 def login():
     """Inicia el flujo de autenticación OAuth 2.0 redirigiendo al usuario a Google."""
@@ -48,7 +51,8 @@ def login():
         logger.info("Iniciando el flujo de autenticación OAuth 2.0.")
         authorization_url, state = flow.authorization_url(
             access_type='offline',
-            include_granted_scopes='true'
+            include_granted_scopes='true',
+            redirect_uri=os.getenv("REDIRECT_URI")
         )
         logger.info(f"URL de autorización generada: {authorization_url}")
         return RedirectResponse(authorization_url)
@@ -56,19 +60,20 @@ def login():
         logger.error(f"Error al iniciar el flujo de autenticación: {e}")
         raise HTTPException(status_code=500, detail="Error al iniciar el flujo de autenticación.")
 
+
 # Endpoint para manejar el callback de OAuth
 @app.get("/oauth2callback")
-def oauth2callback(request: Request):
-    """Maneja la respuesta de Google y guarda las credenciales."""
+async def oauth2callback(request: Request):
+    """Maneja la respuesta de Google y obtiene el token de acceso."""
     try:
         logger.info("Recibiendo el callback de OAuth 2.0.")
-        logger.info(f"URL de la solicitud: {request.url}")
         flow.fetch_token(authorization_response=str(request.url))
         credentials = flow.credentials
         logger.info("Token de acceso obtenido correctamente.")
-        with open(TOKEN_FILE, 'w') as token_file:
+        
+        with open('token.json', 'w') as token_file:
             token_file.write(credentials.to_json())
-        logger.info(f"Credenciales guardadas en {TOKEN_FILE}.")
+        
         return {"message": "Autenticación completada"}
     except Exception as e:
         logger.error(f"Error al manejar el callback de OAuth: {e}")
@@ -77,13 +82,14 @@ def oauth2callback(request: Request):
 # Función para obtener el servicio de YouTube autenticado
 def get_youtube_service():
     """Devuelve un cliente autenticado de la API de YouTube."""
-    if not os.path.exists(TOKEN_FILE):
+    if not os.path.exists('token.json'):
         raise HTTPException(status_code=401, detail="No autenticado. Usa /login primero.")
-    with open(TOKEN_FILE, 'r') as token_file:
+    with open('token.json', 'r') as token_file:
         credentials = Credentials.from_authorized_user_info(json.load(token_file), SCOPES)
     return build('youtube', 'v3', credentials=credentials)
 
-# Endpoint de búsqueda usando la API de YouTube
+
+# Ejemplo: Endpoint para buscar videos usando la API de YouTube
 @app.get("/search")
 def search_videos(query: str):
     """Busca videos en YouTube usando la API oficial."""
@@ -107,7 +113,7 @@ def search_videos(query: str):
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al buscar videos: {e}")
-
+    
 # Endpoint para obtener información del audio
 @app.get("/audioinfo")
 def get_audio_info(url: str):
