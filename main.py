@@ -10,6 +10,7 @@ import re
 import os
 from mutagen.mp4 import MP4
 import logging
+import subprocess
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -235,23 +236,25 @@ def get_audio(video_id: str):
         logger.error(f"[ERROR] No se pudo leer el archivo de cookies: {e}")
         raise HTTPException(status_code=500, detail="Error al leer el archivo de cookies.")
 
-    ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'outtmpl': output_path,
-        'quiet': True,
-        'noplaylist': True,
-        'no_warnings': True,
-        'cookiefile': temp_cookies_path,  # Usar el archivo temporal de cookies
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        },
-    }
-
+    # Ejecutar yt-dlp usando subprocess
     try:
-        logger.info("[LOG] El archivo no existe. Iniciando descarga con yt-dlp...")
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
-        logger.info("[LOG] Descarga completada. Verificando existencia del archivo...")
+        logger.info(f"[LOG] Ejecutando yt-dlp para descargar el audio del video: {video_id}")
+        command = [
+            "yt-dlp",
+            f"https://www.youtube.com/watch?v={video_id}",
+            "--cookies", temp_cookies_path,
+            "-f", "bestaudio[ext=m4a]/bestaudio/best",
+            "-o", output_path
+        ]
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        # Log de la salida del comando
+        logger.info(f"[LOG] Salida de yt-dlp:\n{result.stdout}")
+        if result.returncode != 0:
+            logger.error(f"[ERROR] yt-dlp falló con el siguiente error:\n{result.stderr}")
+            raise HTTPException(status_code=500, detail=f"Error al descargar audio: {result.stderr}")
+
+        # Verificar si el archivo se descargó correctamente
         if os.path.exists(output_path):
             logger.info("[LOG] Archivo descargado correctamente. Sirviendo archivo.")
             return FileResponse(output_path, media_type="audio/mp4")
@@ -259,10 +262,8 @@ def get_audio(video_id: str):
             logger.error("[ERROR] El archivo no se encontró después de la descarga.")
             raise HTTPException(status_code=500, detail="El archivo no se encontró después de la descarga.")
     except Exception as e:
-        logger.error(f"[ERROR] Error al descargar audio: {e}")
-        if os.path.exists(output_path):
-            os.remove(output_path)
-        raise HTTPException(status_code=500, detail=f"Error al descargar audio: {e}")
+        logger.error(f"[ERROR] Error al ejecutar yt-dlp: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al ejecutar yt-dlp: {e}")
     finally:
         # Eliminar el archivo temporal de cookies
         if os.path.exists(temp_cookies_path):
