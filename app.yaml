@@ -1,0 +1,31 @@
+runtime: python39  # Especifica la versión de Python (ajusta según tu entorno)
+
+entrypoint: uvicorn main:app --host 0.0.0.0 --port $PORT  # Comando para iniciar la aplicación
+
+# Configuración de instancias
+instance_class: F2  # Clase de instancia (ajusta según tus necesidades)
+
+# Configuración de recursos
+resources:
+  cpu: 1
+  memory_gb: 1
+  disk_size_gb: 10
+
+# Configuración de red
+network:
+  session_affinity: false
+
+# Configuración de variables de entorno
+env_variables:
+  COOKIES: "contenido_de_tus_cookies"  # Reemplaza con tus cookies o configura en el entorno
+  PYTHONUNBUFFERED: "1"  # Para asegurar que los logs se impriman en tiempo real
+
+# Configuración de tiempos de espera
+handlers:
+- url: /.*
+  script: auto
+  secure: always
+  timeout: 600s  # Tiempo de espera extendido para descargas largas
+
+# Configuración de logs
+env: flex  # Entorno flexible para manejar cargas más pesadas
