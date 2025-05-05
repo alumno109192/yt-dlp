@@ -217,17 +217,25 @@ def get_audio(video_id: str):
 
     # Obtener el contenido de la variable de entorno COOKIES
     cookies_content = os.getenv("COOKIES")
+    temp_cookies_path = None
+
     if not cookies_content:
-        logger.warning("[WARNING] La variable de entorno COOKIES no está configurada.")
-        raise HTTPException(status_code=500, detail="No se encontraron cookies en la variable de entorno.")
+        logger.warning("[WARNING] La variable de entorno COOKIES no está configurada. Intentando usar cookies.txt.")
+        # Verificar si existe el archivo cookies.txt
+        if os.path.exists("cookies.txt"):
+            temp_cookies_path = "cookies.txt"
+            logger.info("[LOG] Usando cookies desde el archivo cookies.txt.")
+        else:
+            logger.error("[ERROR] No se encontró la variable de entorno COOKIES ni el archivo cookies.txt.")
+            raise HTTPException(status_code=500, detail="No se encontraron cookies en la variable de entorno ni en el archivo cookies.txt.")
+    else:
+        # Escribir las cookies en un archivo temporal
+        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as temp_cookies_file:
+            temp_cookies_file.write(cookies_content)
+            temp_cookies_path = temp_cookies_file.name
+        logger.info(f"[LOG] Cookies guardadas temporalmente en: {temp_cookies_path}")
 
-    # Escribir las cookies en un archivo temporal
-    with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as temp_cookies_file:
-        temp_cookies_file.write(cookies_content)
-        temp_cookies_path = temp_cookies_file.name
-
-    # Log para verificar que el archivo se ha guardado
-    logger.info(f"[LOG] Cookies guardadas temporalmente en: {temp_cookies_path}")
+    # Log para verificar que el archivo de cookies se está utilizando
     try:
         with open(temp_cookies_path, "r") as f:
             file_content = f.read()
@@ -270,8 +278,8 @@ def get_audio(video_id: str):
         logger.error(f"[ERROR] Error al ejecutar yt-dlp: {e}")
         raise HTTPException(status_code=500, detail=f"Error al ejecutar yt-dlp: {e}")
     finally:
-        # Eliminar el archivo temporal de cookies
-        if os.path.exists(temp_cookies_path):
+        # Eliminar el archivo temporal de cookies si se creó
+        if temp_cookies_path and temp_cookies_path != "cookies.txt" and os.path.exists(temp_cookies_path):
             os.remove(temp_cookies_path)
 
 # Endpoint para servir el archivo de audio
